@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from 'bcryptjs'
+import dotenv from 'dotenv'
+import jwt from 'jsonwebtoken'
+
+dotenv.config()
 const prisma = new PrismaClient()
 
 //register a new user
@@ -47,6 +51,57 @@ export const registerNewUser = async(req, res) => {
         res.status(500).json({
             success : false,
             message : "Internal Server Error"
+        })
+    }
+}
+
+//login controller
+export const loginUser = async(req, res) => {
+    try{
+        const { email, password } = req.body;
+
+        const user = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password);
+
+        if (!passwordMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
+
+        const payload = {
+            id : user.id,
+            fullName : user.fullName,
+            email : user.email,
+            phone : user.phone,
+            role : user.role
+        }
+
+        //create a token
+        const token = jwt.sign(payload, process.env.JWT_SECRET_KEY)
+        //store the token in the cookie
+        res.cookie('access_token', token).json({
+            success : true,
+            message : "Login Successfull",
+            data : payload
+        })
+
+    }catch(error){
+        console.error("Error Login in User", error)
+        res.status(500).json({
+            success : false,
+            message : 'Internal Server Error'
         })
     }
 }
